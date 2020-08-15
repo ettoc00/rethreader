@@ -117,7 +117,7 @@ class Rethreader:
             _list = list(_object)
             if not target:
                 target = _list.pop(0)
-            if kwargs is None:
+            if not kwargs:
                 if _is_unpacked(_object):
                     _, target, args, kwargs = _object
                 elif isinstance(_object, dict):

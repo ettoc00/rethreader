@@ -10,9 +10,7 @@ setup(
   url = 'https://github.com/ettoc00/rethreader',
   download_url = 'https://github.com/ettoc00/rethreader/archive/1.0.tar.gz',
   keywords = ['thread', 'multi', 'processing'],
-  install_requires=[
-          'threading',
-      ],
+  install_requires=[],
   classifiers=[  # Optional
     # How mature is this project? Common values are
     #   3 - Alpha
