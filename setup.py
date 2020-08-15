@@ -2,7 +2,7 @@ from distutils.core import setup
 setup(
   name = 'rethreader',
   packages = ['rethreader'],
-  version = '0.0',
+  version = '1.0',
   license='MIT',
   description = 'Controlled multi-processing',
   author = 'Ettore Cesari',
