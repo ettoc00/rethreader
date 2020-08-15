@@ -40,9 +40,6 @@ results: (list) list of the returns of the functions
 
 If not specified, the function returns the rethreader.
 
-__add__: append to the queue
-
-__len__: (int) return the number of threads
 
 
 add(*args*): appends to the queue
