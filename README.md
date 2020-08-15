@@ -90,5 +90,5 @@ with Rethreader(print) as rt:
 The queue could already be passed in the initialization as a list of the arguments.
 
 ```Python
-Rethreader(print, [(i, end='') for i in range(10)]).start()
+Rethreader(print, [(i, {"end": ''}) for i in range(10)]).start()
 ```
