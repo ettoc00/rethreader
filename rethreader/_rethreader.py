@@ -61,8 +61,8 @@ class KeyThread:
 def _is_unpacked(_object) -> bool:
     if isinstance(_object, _Key):
         return True
-    return isinstance(_object, tuple) and len(_object) == 4 and isinstance(_object[0], (int, type(None))) and \
-           isinstance(_object[2], tuple) and isinstance(_object[3], dict)
+    return isinstance(_object, tuple) and len(_object) == 4 and isinstance(_object[0], (int, type(None))) \
+           and isinstance(_object[2], tuple) and isinstance(_object[3], dict)
 
 
 def _thread_info(self) -> str:
@@ -76,11 +76,15 @@ def _thread_info(self) -> str:
 
 class Rethreader:
     def __init__(self, target=None, queue: Optional[Iterable] = None, max_threads: int = 16, clock_delay: float = 0.01,
-                 auto_quit: Optional[bool] = None, daemon: bool = False):
+                 auto_quit: Optional[bool] = None, save_results=True, daemon: bool = False):
         self._target = target
         self._main: Set[KeyThread] = set()
-        self._finished: Set[KeyThread] = set()
         self._in_delay_queue: int = 0
+        self._save_results: bool = save_results
+        if save_results:
+            self._finished: Set[KeyThread] = set()
+        else:
+            self._finished: int = 0
         self._daemonic: bool = daemon
         self._clock: float = clock_delay
         self._max_threads: int = 0 if max_threads < 0 else max_threads
@@ -161,7 +165,10 @@ class Rethreader:
         while self._running:
             for t in self._main.copy():
                 if not t.is_alive():
-                    self._finished.add(t)
+                    if self._save_results and isinstance(self._finished, set):
+                        self._finished.add(t)
+                    else:
+                        self._finished += 1
                     self._main.remove(t)
             while self._queue:
                 # if self._max_threads > 0 and len(self._main) >= self._max_threads
@@ -181,6 +188,9 @@ class Rethreader:
         self._queue.append(_object)
         self._in_delay_queue -= 1
 
+    def _insert(self, _object, _index: int = 0):
+        self._queue.insert(_index, _object)
+
     def add(self, *args, **kwargs):
         self._append(self._unpack(*args, **kwargs))
         return self
@@ -188,6 +198,15 @@ class Rethreader:
     def extend(self, _list: list):
         for i in _list:
             self.add(i)
+        return self
+
+    def insert(self, _index: int, *args, **kwargs):
+        self._insert(self._unpack(*args, **kwargs), _index)
+        return self
+
+    def prioritize(self, _list: list):
+        for i in reversed(_list):
+            self._insert(self._unpack(i))
         return self
 
     def remove(self, *args, **kwargs):
@@ -211,7 +230,9 @@ class Rethreader:
 
     @property
     def finished(self) -> int:
-        return len(self._finished)
+        if self._save_results and isinstance(self._finished, set):
+            return len(self._finished)
+        return self._finished
 
     @property
     def in_queue(self) -> int:
@@ -233,7 +254,9 @@ class Rethreader:
 
     @property
     def results(self) -> list:
-        return [None if i == _no_result else i.result for i in sorted(self._finished, key=lambda x: x.id)]
+        if self._save_results and isinstance(self._finished, set):
+            return [None if i == _no_result else i.result
+                    for i in sorted(self._finished, key=lambda x: x.id)]
 
     def start(self):
         self._get_thread(self.run).start()

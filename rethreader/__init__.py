@@ -1,1 +1,1 @@
-from .main import Rethreader
+from ._rethreader import Rethreader
