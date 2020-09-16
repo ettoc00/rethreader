@@ -8,7 +8,7 @@ setup(
   author = 'Ettore Cesari',
   author_email = 'ettore.cesari@yahoo.it',
   url = 'https://github.com/ettoc00/rethreader',
-  download_url = 'https://github.com/ettoc00/rethreader/archive/1.0.1.tar.gz',
+  download_url = 'https://github.com/ettoc00/rethreader/archive/1.0.2.tar.gz',
   keywords = ['thread', 'multi', 'processing'],
   install_requires=[
           'threading',
