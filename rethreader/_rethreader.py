@@ -7,14 +7,14 @@ _Key = namedtuple("Key", ["id", "target", "args", "kwargs"])
 
 
 class Description(str):
-    def __init__(self, data: str):
-        super().__init__(data)
-        self.data = data
+    def __init__(self, string: str):
+        super().__init__()
+        self.string = string
         self._null_key = _Key(None, None, None, None)
 
     def __eq__(self, other):
         if isinstance(other, Description):
-            return self.data == other.data
+            return self.string == other.string
         return False
 
     def __repr__(self):
@@ -249,6 +249,9 @@ class Rethreader:
         return self._running
 
     def quit(self):
+        self._queue.clear()
+        for thread in self._main:
+            thread.stop()
         self._running = False
         return self
 
