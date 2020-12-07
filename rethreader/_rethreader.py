@@ -1,5 +1,5 @@
+import threading
 from collections import namedtuple
-from threading import Thread
 from time import sleep
 from typing import Optional, Iterable, List, Set
 
@@ -21,7 +21,7 @@ class Description(str):
 _no_result = Description("No Result")
 
 
-class KeyThread:
+class KeyThread(threading.Thread):
     def __init__(self, key: _Key, daemon: Optional[bool] = None):
         self.key = key
         n, target, args, kwargs = key
@@ -29,22 +29,16 @@ class KeyThread:
             kwargs = {}
         self.id = n
         self._result = _no_result
-        self._thread = Thread(target=(lambda t: self.set_result(t(*args, **kwargs))),
-                              args=(target,), daemon=daemon)
-
-    def __repr__(self):
-        return self._thread.__repr__()
+        super(KeyThread, self).__init__(target=(lambda t: self.set_result(t(*args, **kwargs))),
+                                        args=(target,), daemon=daemon)
 
     @property
     def info(self):
         return '; '.join(str(i) for i in list(self.key)[1:])
 
-    def is_alive(self):
-        return self._thread.is_alive()
-
-    @staticmethod
-    def of(target=None, args=(), kwargs=None, daemon=None):
-        return KeyThread(_Key(None, target, args, kwargs), daemon)
+    @classmethod
+    def of(cls, target=None, args=(), kwargs=None, daemon=None):
+        return cls(_Key(None, target, args, kwargs), daemon)
 
     @property
     def result(self):
@@ -54,7 +48,12 @@ class KeyThread:
         self._result = result
 
     def start(self):
-        self._thread.start()
+        super(KeyThread, self).start()
+        return self
+
+    def stop(self):
+        if self.is_alive():
+            self._stop()
         return self
 
 
@@ -214,6 +213,8 @@ class Rethreader:
         for _list in (self._queue, self._main):
             for thread in _list.copy():
                 if _thread_info(thread) == _object_thread:
+                    if hasattr(thread, 'stop'):
+                        thread.stop()
                     _list.remove(thread)
                     return self
         return self
