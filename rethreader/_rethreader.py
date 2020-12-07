@@ -7,15 +7,18 @@ _Key = namedtuple("Key", ["id", "target", "args", "kwargs"])
 
 
 class Description(str):
-    def __init__(self, string: str):
-        super().__init__()
-        self.string = string
+    def __init__(self, data: str):
+        super().__init__(data)
+        self.data = data
         self._null_key = _Key(None, None, None, None)
 
     def __eq__(self, other):
         if isinstance(other, Description):
-            return self.string == other.string
+            return self.data == other.data
         return False
+
+    def __repr__(self):
+        return f"Description('{self}')"
 
 
 _no_result = Description("No Result")
@@ -80,7 +83,7 @@ class Rethreader:
         self._main: Set[KeyThread] = set()
         self._in_delay_queue: int = 0
         self._save_results: bool = save_results
-        if save_results:
+        if self._save_results:
             self._finished: Set[KeyThread] = set()
         else:
             self._finished: int = 0
@@ -157,20 +160,20 @@ class Rethreader:
     def _start_next(self):
         next_target = self._queue.pop(0)
         next_thread = self._load_target(next_target)
-        self._main.add(next_thread.start())
+        next_thread.start()
+        self._main.add(next_thread)
 
     def run(self):
         self._running = True
         while self._running:
             for t in self._main.copy():
                 if not t.is_alive():
-                    if self._save_results and isinstance(self._finished, set):
+                    if self._save_results:
                         self._finished.add(t)
                     else:
                         self._finished += 1
                     self._main.remove(t)
             while self._queue:
-                # if self._max_threads > 0 and len(self._main) >= self._max_threads
                 if 0 < self._max_threads <= len(self._main):
                     break
                 self._start_next()
@@ -231,7 +234,7 @@ class Rethreader:
 
     @property
     def finished(self) -> int:
-        if self._save_results and isinstance(self._finished, set):
+        if self._save_results:
             return len(self._finished)
         return self._finished
 
@@ -255,7 +258,7 @@ class Rethreader:
 
     @property
     def results(self) -> list:
-        if self._save_results and isinstance(self._finished, set):
+        if self._save_results:
             return [None if i == _no_result else i.result
                     for i in sorted(self._finished, key=lambda x: x.id)]
 
