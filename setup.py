@@ -3,13 +3,13 @@ from distutils.core import setup
 setup(
     name='rethreader',
     packages=['rethreader'],
-    version='1.0.4',
+    version='1.0.5',
     license='MIT',
     description='Controlled multi-threading',
     author='Ettore Cesari',
     author_email='ettore.cesari@yahoo.it',
     url='https://github.com/ettoc00/rethreader',
-    download_url='https://github.com/ettoc00/rethreader/archive/1.0.4.tar.gz',
+    download_url='https://github.com/ettoc00/rethreader/archive/1.0.5.tar.gz',
     keywords=['thread', 'multi', 'processing'],
     install_requires=[],
     classifiers=[  # Optional
