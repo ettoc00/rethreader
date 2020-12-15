@@ -90,7 +90,7 @@ def _is_unpacked(_object) -> bool:
     if isinstance(_object, _Key):
         return True
     return isinstance(_object, tuple) and len(_object) == 4 and isinstance(_object[0], (int, type(None))) and \
-           isinstance(_object[2], tuple) and isinstance(_object[3], dict)
+           callable(_object[1]) and isinstance(_object[2], tuple) and isinstance(_object[3], dict)
 
 
 def _thread_info(self) -> str:
@@ -105,6 +105,8 @@ def _thread_info(self) -> str:
 class Rethreader:
     def __init__(self, target=None, queue: Optional[Iterable] = None, max_threads: int = 16, clock_delay: float = 0.01,
                  auto_quit: Optional[bool] = None, save_results=True, daemon: bool = False):
+        if target is not None:
+            assert callable(target)
         self._target = target
         self._main: Set[KeyThread] = set()
         self._in_delay_queue: int = 0
@@ -147,7 +149,7 @@ class Rethreader:
         _list = None
         if _object and isinstance(_object, Iterable) and not isinstance(_object, str):
             _list = list(_object)
-            if not target:
+            if not target and callable(_list[0]):
                 target = _list.pop(0)
             if not kwargs:
                 if _is_unpacked(_object):
