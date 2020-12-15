@@ -120,6 +120,7 @@ class Rethreader:
             [self.add(_t) for _t in queue]
         self._auto_quit: bool = auto_quit if auto_quit else bool(queue)
         self._running: bool = False
+        self._start_thread = None
 
     def __add__(self, *args, **kwargs):
         self._append(self._unpack(*args, **kwargs))
@@ -274,12 +275,20 @@ class Rethreader:
     def is_alive(self) -> bool:
         return self._running
 
-    def quit(self):
+    def kill(self):
         self._queue.clear()
         for thread in self._main:
             thread.kill()
+        self._main.clear()
         self._running = False
+        if self._start_thread:
+            self._start_thread.kill()
         return self
+
+    def quit(self):
+        self.auto_quit()
+        while self._running:
+            sleep(self._clock)
 
     @property
     def remaining(self) -> int:
@@ -292,7 +301,8 @@ class Rethreader:
                     for i in sorted(self._finished, key=lambda x: x.id)]
 
     def start(self):
-        self._get_thread(self.run).start()
+        self._start_thread = self._get_thread(self.run)
+        self._start_thread.start()
         return self
 
 
