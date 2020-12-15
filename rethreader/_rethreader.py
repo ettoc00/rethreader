@@ -1,3 +1,4 @@
+import sys
 import threading
 from collections import namedtuple
 from time import sleep
@@ -31,9 +32,29 @@ class KeyThread(threading.Thread):
         if kwargs is None:
             kwargs = {}
         self.id = n
+        self.killed = False
         self._result = _no_result
         super(KeyThread, self).__init__(target=(lambda t: self.set_result(t(*args, **kwargs))),
                                         args=(target,), daemon=daemon)
+        self._run_backup = self.run
+
+    def globaltrace(self, _, event, __):
+        if event == 'call':
+            return self.localtrace
+        else:
+            return None
+
+    def localtrace(self, _, event, __):
+        if self.killed:
+            if event == 'line':
+                raise SystemExit()
+        return self.localtrace
+
+    def kill(self):
+        self.killed = True
+        if self.is_alive():
+            self.join(0)
+        return self
 
     @property
     def info(self):
@@ -47,24 +68,29 @@ class KeyThread(threading.Thread):
     def result(self):
         return self._result
 
+    def run(self):
+        super(KeyThread, self).run()
+        return self
+
+    def run_with_trace(self):
+        sys.settrace(self.globaltrace)
+        self._run_backup()
+        self.run = self._run_backup
+
     def set_result(self, result):
         self._result = result
 
     def start(self):
+        self.run = self.run_with_trace
         super(KeyThread, self).start()
-        return self
-
-    def stop(self):
-        if self.is_alive():
-            self._stop()
         return self
 
 
 def _is_unpacked(_object) -> bool:
     if isinstance(_object, _Key):
         return True
-    return isinstance(_object, tuple) and len(_object) == 4 and isinstance(_object[0], (int, type(None))) \
-           and isinstance(_object[2], tuple) and isinstance(_object[3], dict)
+    return isinstance(_object, tuple) and len(_object) == 4 and isinstance(_object[0], (int, type(None))) and \
+           isinstance(_object[2], tuple) and isinstance(_object[3], dict)
 
 
 def _thread_info(self) -> str:
@@ -82,8 +108,7 @@ class Rethreader:
         self._target = target
         self._main: Set[KeyThread] = set()
         self._in_delay_queue: int = 0
-        self._save_results: bool = save_results
-        if self._save_results:
+        if save_results:
             self._finished: Set[KeyThread] = set()
         else:
             self._finished: int = 0
@@ -164,11 +189,12 @@ class Rethreader:
         self._main.add(next_thread)
 
     def run(self):
+        _fin = isinstance(self._finished, set)
         self._running = True
         while self._running:
             for t in self._main.copy():
                 if not t.is_alive():
-                    if self._save_results:
+                    if _fin:
                         self._finished.add(t)
                     else:
                         self._finished += 1
@@ -234,7 +260,7 @@ class Rethreader:
 
     @property
     def finished(self) -> int:
-        if self._save_results:
+        if isinstance(self._finished, set):
             return len(self._finished)
         return self._finished
 
@@ -251,7 +277,7 @@ class Rethreader:
     def quit(self):
         self._queue.clear()
         for thread in self._main:
-            thread.stop()
+            thread.kill()
         self._running = False
         return self
 
@@ -261,7 +287,7 @@ class Rethreader:
 
     @property
     def results(self) -> list:
-        if self._save_results:
+        if isinstance(self._finished, set):
             return [None if i == _no_result else i.result
                     for i in sorted(self._finished, key=lambda x: x.id)]
 
