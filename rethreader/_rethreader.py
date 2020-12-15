@@ -207,7 +207,7 @@ class Rethreader:
                     break
                 self._start_next()
             if self._auto_quit and self.is_empty():
-                self.quit()
+                self._running = False
             else:
                 sleep(self._clock)
         return self
