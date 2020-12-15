@@ -231,6 +231,16 @@ class Rethreader:
             self.add(i)
         return self
 
+    def find(self, *args, **kwargs):
+        _object_thread = _thread_info(self._unpack(*args, **kwargs))
+        _lists = [self._main, self._queue]
+        if isinstance(self._finished, set):
+            _lists.append(self._finished)
+        for _list in _lists:
+            for thread in _list.copy():
+                if _thread_info(thread) == _object_thread:
+                    return thread
+
     def insert(self, _index: int, *args, **kwargs):
         self._insert(self._unpack(*args, **kwargs), _index)
         return self
@@ -241,14 +251,15 @@ class Rethreader:
         return self
 
     def remove(self, *args, **kwargs):
-        _object_thread = _thread_info(self._unpack(*args, **kwargs))
-        for _list in (self._queue, self._main):
-            for thread in _list.copy():
-                if _thread_info(thread) == _object_thread:
-                    if hasattr(thread, 'stop'):
-                        thread.stop()
-                    _list.remove(thread)
-                    return self
+        if thread := self.find(*args, **kwargs):
+            _list = self._queue
+            if isinstance(thread, KeyThread):
+                thread.kill()
+                _list = self._main
+            try:
+                _list.remove(thread)
+            except KeyError:
+                pass
         return self
 
     def postpone(self, delay, *args, **kwargs):
