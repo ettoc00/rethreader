@@ -1,7 +1,6 @@
 from distutils.core import setup
 
 setup(
-<<<<<<< HEAD
     name='rethreader',
     packages=['rethreader'],
     version='1.0.6',
