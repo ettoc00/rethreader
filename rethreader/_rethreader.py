@@ -1,105 +1,105 @@
-import sys
-import threading
+import ctypes
 from collections import namedtuple
+from threading import Thread
 from time import sleep
 from typing import Optional, Iterable, List, Set
 
-_Key = namedtuple("Key", ["id", "target", "args", "kwargs"])
+Key = namedtuple("Key", ["id", "target", "args", "kwargs"])
 
 
-class Description(str):
+class Description:
     def __init__(self, string: str):
         super().__init__()
         self.string = string
-        self._null_key = _Key(None, None, None, None)
 
     def __eq__(self, other):
-        if isinstance(other, Description):
-            return self.string == other.string
-        return False
+        return type(self) == type(other) and self.string == other.string
+
+    def __str__(self):
+        return self.string
 
     def __repr__(self):
-        return f"Description('{self}')"
+        return f"{self.__class__.__name__}('{self.string}')"
 
 
-_no_result = Description("No Result")
+_no_id = Description("No Id")
+_not_returned = Description("Not Returned")
+_thread_info_descriptor = Description("Thread Info")
 
 
-class KeyThread(threading.Thread):
-    def __init__(self, key: _Key, daemon: Optional[bool] = None):
+class ThreadInfo(Description):
+    def __init__(self, k, sep=None):
+        _sep = sep or '; '
+        _, a, b, c = k
+        tup = str(a), str(b), str(c)
+
+        def cond():
+            return any(map(lambda x: _sep in x, tup))
+
+        if sep and cond():
+            raise ValueError('An argument contains the separator')
+        while cond():
+            _sep = ';' + _sep
+        string = _sep.join(str(i) for i in tup)
+        super(ThreadInfo, self).__init__(string)
+        self.sep = _sep
+
+    def key(self):
+        return Key(_thread_info_descriptor, *self.string.split(self.sep))
+
+
+class KeyThread(Thread):
+    def __init__(self, key: Key, daemon: Optional[bool] = None):
+        assert _is_unpacked(key)
+        assert key.id != _thread_info_descriptor
         self.key = key
         n, target, args, kwargs = key
         if kwargs is None:
             kwargs = {}
         self.id = n
-        self.killed = False
-        self._result = _no_result
-        super(KeyThread, self).__init__(target=(lambda t: self.set_result(t(*args, **kwargs))),
-                                        args=(target,), daemon=daemon)
-        self._run_backup = self.run
-
-    def globaltrace(self, _, event, __):
-        if event == 'call':
-            return self.localtrace
-        else:
-            return None
-
-    def localtrace(self, _, event, __):
-        if self.killed:
-            if event == 'line':
-                raise SystemExit()
-        return self.localtrace
-
-    def kill(self):
-        self.killed = True
-        if self.is_alive():
-            self.join(0)
-        return self
+        self._result = _not_returned
+        super(KeyThread, self).__init__(target=target, args=args, kwargs=kwargs, daemon=daemon)
 
     @property
     def info(self):
-        return '; '.join(str(i) for i in list(self.key)[1:])
+        return ThreadInfo(self.key)
+
+    def kill(self):
+        if self.is_alive():
+            res = ctypes.pythonapi.PyThreadState_SetAsyncExc(self.ident, ctypes.py_object(SystemExit))
+            if res > 1:
+                ctypes.pythonapi.PyThreadState_SetAsyncExc(self.ident, 0)
+            self.join(0)
 
     @classmethod
     def of(cls, target=None, args=(), kwargs=None, daemon=None):
-        return cls(_Key(None, target, args, kwargs), daemon)
+        return cls(Key(_no_id, target, args, kwargs), daemon)
 
     @property
     def result(self):
         return self._result
 
     def run(self):
-        super(KeyThread, self).run()
+        self._result = self._target(*self._args, **self._kwargs)
         return self
 
-    def run_with_trace(self):
-        sys.settrace(self.globaltrace)
-        self._run_backup()
-        self.run = self._run_backup
-
-    def set_result(self, result):
-        self._result = result
-
     def start(self):
-        self.run = self.run_with_trace
         super(KeyThread, self).start()
         return self
 
 
 def _is_unpacked(_object) -> bool:
-    if isinstance(_object, _Key):
+    if isinstance(_object, Key):
         return True
     return isinstance(_object, tuple) and len(_object) == 4 and isinstance(_object[0], (int, type(None))) and \
            callable(_object[1]) and isinstance(_object[2], tuple) and isinstance(_object[3], dict)
 
 
-def _thread_info(self) -> str:
+def thread_info(self) -> ThreadInfo:
     if isinstance(self, KeyThread):
         return self.info
     elif _is_unpacked(self):
-        _, a, b, c = self
-        self = a, tuple(b), dict(c)
-        return '; '.join(str(i) for i in self)
+        return ThreadInfo(self)
 
 
 class Rethreader:
@@ -117,7 +117,7 @@ class Rethreader:
         self._daemonic: bool = daemon
         self._clock: float = clock_delay
         self._max_threads: int = 0 if max_threads < 0 else max_threads
-        self._queue: List[_Key] = []
+        self._queue: List[Key] = []
         if queue:
             [self.add(_t) for _t in queue]
         self._auto_quit: bool = auto_quit if auto_quit else bool(queue)
@@ -139,10 +139,10 @@ class Rethreader:
     def __len__(self) -> int:
         return self.remaining + self.finished
 
-    def _unpack(self, *_object, **kwargs) -> _Key:
+    def _unpack(self, *_object, **kwargs) -> Key:
         if isinstance(_object, tuple) and len(_object) == 1:
             _object = _object[0]
-        if _object and isinstance(_object, _Key):
+        if _object and isinstance(_object, Key):
             return _object
         target = None if self._target is None else self._target
         args = None
@@ -172,11 +172,16 @@ class Rethreader:
                     args = _object
                 else:
                     args = (_object,)
-            return _Key(len(self), target, args, kwargs)
-        return _Key(len(self), _object, (), kwargs)
+            return Key(len(self), target, args, kwargs)
+        return Key(len(self), _object, (), kwargs)
+
+    def _info_unpack(self, *args, **kwargs):
+        if len(args) == 1 and isinstance(args[0], ThreadInfo):
+            return args[0].key()
+        return self._unpack(*args, **kwargs)
 
     def _get_thread(self, target=None, args=(), kwargs=None) -> KeyThread:
-        if isinstance(target, _Key):
+        if isinstance(target, Key):
             return KeyThread(target, self._daemonic)
         return KeyThread.of(target, args, kwargs, self._daemonic)
 
@@ -192,12 +197,12 @@ class Rethreader:
         self._main.add(next_thread)
 
     def run(self):
-        _fin = isinstance(self._finished, set)
+        _save = type(self._finished) == set
         self._running = True
         while self._running:
             for t in self._main.copy():
                 if not t.is_alive():
-                    if _fin:
+                    if _save:
                         self._finished.add(t)
                     else:
                         self._finished += 1
@@ -219,6 +224,15 @@ class Rethreader:
         self._queue.append(_object)
         self._in_delay_queue -= 1
 
+    def _find(self, _thread_info: ThreadInfo):
+        _lists = [self._main, self._queue]
+        if isinstance(self._finished, set):
+            _lists.append(self._finished)
+        for _list in _lists:
+            for thread in _list.copy():
+                if thread_info(thread) == _thread_info:
+                    return thread
+
     def _insert(self, _object, _index: int = 0):
         self._queue.insert(_index, _object)
 
@@ -226,20 +240,15 @@ class Rethreader:
         self._append(self._unpack(*args, **kwargs))
         return self
 
+    def find(self, *args, **kwargs):
+        thi = ThreadInfo(self._info_unpack(*args, **kwargs))
+        if thread := self._find(thi):
+            return thread
+
     def extend(self, _list: list):
         for i in _list:
             self.add(i)
         return self
-
-    def find(self, *args, **kwargs):
-        _object_thread = _thread_info(self._unpack(*args, **kwargs))
-        _lists = [self._main, self._queue]
-        if isinstance(self._finished, set):
-            _lists.append(self._finished)
-        for _list in _lists:
-            for thread in _list.copy():
-                if _thread_info(thread) == _object_thread:
-                    return thread
 
     def insert(self, _index: int, *args, **kwargs):
         self._insert(self._unpack(*args, **kwargs), _index)
@@ -251,7 +260,8 @@ class Rethreader:
         return self
 
     def remove(self, *args, **kwargs):
-        if thread := self.find(*args, **kwargs):
+        _thi = ThreadInfo(self._info_unpack(*args, **kwargs))
+        if thread := self._find(_thi):
             _list = self._queue
             if isinstance(thread, KeyThread):
                 thread.kill()
@@ -310,7 +320,7 @@ class Rethreader:
     @property
     def results(self) -> list:
         if isinstance(self._finished, set):
-            return [None if i == _no_result else i.result
+            return [None if i == _not_returned else i.result
                     for i in sorted(self._finished, key=lambda x: x.id)]
 
     def start(self):
