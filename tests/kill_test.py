@@ -5,11 +5,11 @@ from rethreader._rethreader import KeyThread
 def action():
     for i in range(10):
         print(i)
-        sleep(4)
+        sleep(0.4)
 
 
 if __name__ == '__main__':
-    kt = KeyThread.of(action).start()
-    sleep(10)
-    print(10)
+    kt = KeyThread(None, action).start()
+    sleep(1)
+    print(1)
     kt.kill()
