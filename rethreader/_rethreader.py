@@ -69,21 +69,18 @@ class Rethreader:
             return args[0].key()
         return self._unpack(*args, **kwargs)
 
-    def _get_thread(self, target=None, args=(), kwargs=None) -> KeyThread:
+    def _load_target(self, target) -> KeyThread:
         if isinstance(target, Key):
             return KeyThread.of(target, self._daemonic)
-        return KeyThread(None, target, args, kwargs, self._daemonic)
-
-    def _load_target(self, target) -> KeyThread:
         if isinstance(target, KeyThread):
             return target
-        return self._get_thread(self._unpack(target))
 
     def _start_next(self):
-        next_target = self._queue.pop(0)
+        next_target = self._queue[0]
         next_thread = self._load_target(next_target)
-        next_thread.start()
-        self._main.add(next_thread)
+        if next_thread.start():
+            self._main.add(next_thread)
+        self._queue.remove(next_target)
 
     def run(self):
         self._running = True
@@ -123,15 +120,31 @@ class Rethreader:
         self._queue.insert(0, _object)
 
     def _wait_return(self, _thread_info: ThreadInfo):
-        key = self._find(_thread_info)
-        if isinstance(key, Key):
-            while key in self._queue:
-                sleep(self._clock)
-        kt = self._find(_thread_info)
-        if kt:
-            while kt in self._main:
+        def _force_find():
+            for _ in range(5):
+                _o = self._find(_thread_info)
+                if _o is None:
+                    sleep(self._clock)
+                else:
+                    return _o
+
+        def _wait_thread(kt):
+            while kt in self._main and kt.is_alive():
                 sleep(self._clock)
             return kt
+
+        def _wait_key(key):
+            while key in self._queue:
+                sleep(self._clock)
+            kt = _force_find()
+            if kt:
+                return _wait_thread(kt)
+
+        f = _force_find()
+        if isinstance(f, Key):
+            return _wait_key(f)
+        elif isinstance(f, KeyThread):
+            return _wait_thread(f)
 
     def add(self, *args, **kwargs):
         self._append(self._unpack(*args, **kwargs))
@@ -146,7 +159,13 @@ class Rethreader:
     def execute(self, *args, **kwargs):
         _key = self._unpack(*args, **kwargs)
         self._insert(_key)
-        return self._wait_return(ThreadInfo.of(_key)).result
+        return self.wait_result(_key)
+
+    def multi_execute(self, _list: Iterable):
+        _keys = list(map(self._unpack, _list))
+        for k in _keys:
+            self._insert(k)
+        return [self.wait_result(_key) for _key in _keys]
 
     def extend(self, _list: Iterable):
         for i in _list:
@@ -158,14 +177,20 @@ class Rethreader:
         return self
 
     def prioritize(self, _list: Iterable):
-        for i in reversed(list(_list)):
-            self._insert(self._unpack(i))
+        for i in _list:
+            self.insert(i)
         return self
 
     def task(self, *args, **kwargs):
         _key = self._unpack(*args, **kwargs)
         self._append(_key)
-        return self._wait_return(ThreadInfo.of(_key)).result
+        return self.wait_result(_key)
+
+    def multi_task(self, _list: Iterable):
+        _keys = list(map(self._unpack, _list))
+        for k in _keys:
+            self._append(k)
+        return [self.wait_result(_key) for _key in _keys]
 
     def remove(self, *args, **kwargs):
         _thi = ThreadInfo(self._info_unpack(*args, **kwargs))
@@ -184,7 +209,7 @@ class Rethreader:
     def postpone(self, delay, *args, **kwargs):
         _object = self._unpack(*args, **kwargs)
         self.remove(_object)
-        self._get_thread(self._append, (_object, delay)).start()
+        KeyThread(None, self._append, (_object, delay)).start()
         return self
 
     def auto_quit(self, _bool: bool = True):
@@ -205,14 +230,19 @@ class Rethreader:
     def is_alive(self) -> bool:
         return self._running
 
-    def kill(self):
+    def clear(self):
+        self.kill()
         self._queue.clear()
+        self._main.clear()
+        self._finished_set.clear()
+
+    def kill(self):
         for thread in self._main:
             thread.kill()
-        self._main.clear()
         self._running = False
         if self._start_thread:
             self._start_thread.kill()
+            self._start_thread = None
         return self
 
     def quit(self):
@@ -234,9 +264,14 @@ class Rethreader:
             return [i.result for i in sorted(self._finished_set, key=lambda x: x.id)]
 
     def start(self):
-        self._start_thread = self._get_thread(self.run)
+        self._start_thread = KeyThread(None, self.run)
         self._start_thread.start()
         return self
+
+    def wait_result(self, _key):
+        r = self._wait_return(ThreadInfo.of(_key))
+        if r:
+            return r.result
 
 
 if __name__ == '__main__':

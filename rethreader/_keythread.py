@@ -19,6 +19,9 @@ class KeyThread(Thread):
         self._result = not_returned
         super(KeyThread, self).__init__(target=target, args=args, kwargs=kwargs, daemon=daemon)
 
+    def __bool__(self):
+        return self._target != null
+
     @classmethod
     def of(cls, k: Key, d=None):
         return cls(*k, d)

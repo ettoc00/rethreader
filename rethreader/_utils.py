@@ -25,6 +25,9 @@ class FakeSet:
     def add(self, other):
         pass
 
+    def clear(self):
+        pass
+
 
 class Description:
     def __init__(self, string: str):
