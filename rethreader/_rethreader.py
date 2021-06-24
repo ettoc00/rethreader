@@ -1,7 +1,7 @@
 from time import sleep
 from typing import Optional, Iterable, List, Set
 from ._keythread import KeyThread
-from ._utils import Key, is_collection, is_unpacked, ThreadInfo, FakeSet
+from ._utils import Key, is_collection, is_unpacked, ThreadInfo, FakeSet, missing
 
 
 class Rethreader:
@@ -45,6 +45,8 @@ class Rethreader:
         if isinstance(_object, tuple):
             if len(_object) == 1:
                 _object = _object[0]
+            elif len(_object) == 0:
+                _object = missing
             if is_unpacked(_object):
                 return Key(*_object)
         target, args = self._target, None
@@ -55,7 +57,7 @@ class Rethreader:
                     target = _list.pop(0)
             elif callable(_object):
                 target = _object
-                _object = None
+                _object = missing
         if not kwargs and _list and type(_list[-1]) == dict:
             kwargs = _list.pop(-1)
         if _list and len(_list) == 1 and type(_list[0]) == tuple:
@@ -65,6 +67,8 @@ class Rethreader:
                 _object = _object.__class__(_list)
             if type(_object) == tuple:
                 args = _object
+            elif _object == missing:
+                args = ()
             else:
                 args = (_object,)
         return Key(len(self), target, args, kwargs)

@@ -1,6 +1,7 @@
 from collections import namedtuple
 
 Key = namedtuple("Key", ["id", "target", "args", "kwargs"])
+missing = object()
 
 
 def is_collection(self) -> bool:
