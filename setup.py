@@ -3,13 +3,13 @@ from distutils.core import setup
 setup(
     name='rethreader',
     packages=['rethreader'],
-    version='1.1.2',
+    version='1.1.3',
     license='MIT',
     description='Controlled multi-threading',
     author='Ettore Cesari',
     author_email='ettore.cesari@yahoo.it',
     url='https://github.com/ettoc00/rethreader',
-    download_url='https://github.com/ettoc00/rethreader/archive/1.1.2.tar.gz',
+    download_url='https://github.com/ettoc00/rethreader/archive/1.1.3.tar.gz',
     keywords=['thread', 'multi', 'processing'],
     install_requires=[],
     classifiers=[  # Optional
@@ -29,11 +29,5 @@ setup(
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
     ],
 )

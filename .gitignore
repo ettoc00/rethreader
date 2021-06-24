@@ -132,5 +132,7 @@ dmypy.json
 .idea/
 
 # Other
+setup.cfg
+setup.py
 update.bat
 .gitignore
