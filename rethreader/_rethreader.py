@@ -55,7 +55,7 @@ class Rethreader:
                     target = _list.pop(0)
             elif callable(_object):
                 target = _object
-                _object = ()
+                _object = None
         if not kwargs and _list and type(_list[-1]) == dict:
             kwargs = _list.pop(-1)
         if _list and len(_list) == 1 and type(_list[0]) == tuple:
