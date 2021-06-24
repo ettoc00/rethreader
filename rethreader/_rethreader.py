@@ -49,8 +49,12 @@ class Rethreader:
                 return Key(*_object)
         target, args = self._target, None
         _list = list(_object) if is_collection(_object) else None
-        if target is None and _list and callable(_list[0]):
-            target = _list.pop(0)
+        if target is None:
+            if _list:
+                if callable(_list[0]):
+                    target = _list.pop(0)
+            elif callable(_object):
+                target = _object
         if not kwargs and _list and type(_list[-1]) == dict:
             kwargs = _list.pop(-1)
         if _list and len(_list) == 1 and type(_list[0]) == tuple:
@@ -70,7 +74,7 @@ class Rethreader:
         return self._unpack(*args, **kwargs)
 
     def _load_target(self, target) -> KeyThread:
-        if isinstance(target, Key):
+        if is_unpacked(target):
             return KeyThread.of(target, self._daemonic)
         if isinstance(target, KeyThread):
             return target
